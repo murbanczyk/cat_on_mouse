@@ -1,0 +1,82 @@
+########################################################
+#
+# UF T1-T2 (inversion) Pulse sequence
+# Written by: Mateusz Urbanczyk
+#
+########################################################
+
+procedure(pulse_program,dir,mode)
+
+
+# Interface description (name, label, x, y, ctrlType, varType)
+   interface = ["b1Freq",       "B1 Frequency (MHz)",   "0","0",     "tbwv",  "freq",
+               "repTime",      "Repetition time (ms)", "0","1.6",   "tbwv",   "float,[20,1e8]",
+               "90Amplitude",  "90 amplitude (dB)",    "1","0",     "tb",     "pulseamp",
+               "180Amplitude", "180 amplitude (dB)",   "1","1",     "tb",     "pulseamp",
+               "pulseLength",  "Pulse length (us)",    "1","4",     "tb",     "float,[2,500]",
+               "CHIRPamplitude", "CHIRP 180 amplitude (dB)",   "1","2",     "tb",     "pulseamp",
+               "CHIRPstep",  "CHIRP step length (us)",    "1","3",     "tb",     "float,[2,1000]",              
+              "AmplitudeTable", "File with amplitudeTable",      "3","0",  "tbw", "string, 200",
+              "PhaseTable", "File with Prospa phase table",  "3","1",  "tbw", "string, 200",
+               "echoTime",     "Echotime (us)",        "2","0",     "tb",     "sdelay",
+             "chirpdel",     "After chirp delay (us)",        "2","3",     "tb",     "sdelay",
+               "nrEchoes",     "Number of echoes",     "2","1",     "tb",     "integer,[1,8192]",              
+                "Tablesize",     "Size of Amp and Phase tables",     "3","2",     "tb",     "integer,[1,64000]",
+               "echoShift",    "Echo shift (us)",      "2","2",     "tb",     "float,[-20,20]",
+               "autoPhase",    "Auto-phase",           "2","4",     "cb",     "no,yes"]
+  
+  tabs = ["Pulse sequence","Acquisition","Laplace_CPMG","File Settings"]
+
+# Relationships between pulse-sequence and GUI parameters
+   relationships = ["a1 = 90Amplitude",
+                    "a2 = 180Amplitude",
+                    "a3 = CHIRPamplitude",
+                    "d5 = CHIRPstep",
+                    "d1 = pulseLength",
+                    "d2 = echoTime/2-d1-pgo",
+                    "d33 = chirpdel",
+                    "d3 = echoTime/2-acqTime*500-d1/2+rxLat+echoShift",
+                    "d4 = echoTime-d1-pgo-d3",
+                    "n1 = nrEchoes",
+                    "n2 = nrPnts",
+                    "n22 = Tablesize",
+				  "n333 = (2*n22+nrPnts*nrEchoes)",
+                    "t1 = linvec(1,0,n22)", #looks idiotic but not sure if matrix and vector are intertwined as table vector in prospa
+                	"t2 = linvec(0,0,n22)",# this will keep console safe if writing table to DSP from mac will not succeed
+                    "totPnts = nrPnts*nrEchoes",
+                    "totTime = nrEchoes*echoTime+ n22*d5"]
+
+# These parameters will be changed between experiments
+   variables = ["t1","t2"]
+
+# x and y spacing between controls
+   dim = [200,26]
+
+# Pulse sequence
+   initpp(dir) # Reset internal parameter list
+   cleardata(n333)
+
+   shapedrf(mode, t1,t2, p1, n22,d5)
+   delay(d33)
+   
+   pulse(mode,a1,p2,d1)           # 90 pulse
+   delay(d2)                      # 90 - 180 delay
+   
+   loop(l1,n1)
+    pulse(mode,a2,p3,d1)        # 180 internal pulse
+  delay(d3)                   # 180 - acq delay
+      acquire("append",n2,d4)     # Acquire echo and wait
+   endloop(l1)
+
+   lst = endpp() # Return parameter list
+
+# Phase cycle
+   phaseList = [0,0,0,0,2,2,2,2; # chirp phase
+   0,2,0,2,0,2,0,2;  # 90 deg phase
+   1,1,3,3,1,1,3,3; # 180 deg phase
+   0,2,0,2,0,2,0,2] #Acquire phase
+   
+   
+
+
+endproc(lst,tabs,interface,relationships,variables,dim,phaseList)
