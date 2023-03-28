@@ -1,2 +1,2 @@
 # cat_on_mouse
-The files need for creation of Cryoporometry Automated tool for NMR MOUSE
+The files need for creation of Control and Automation of Temperature (CAT) device for NMR MOUSE
